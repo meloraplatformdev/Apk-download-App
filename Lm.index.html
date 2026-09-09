@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>APK SZ Store & Developer Console</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Inter Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
+
+  <style>
+    :root {
+      --primary: #2563eb; --primary-dark: #1d4ed8; --accent: #10b981;
+      --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b;
+      --border: #e2e8f0; --shadow: 0 8px 24px -4px rgba(0,0,0,0.06);
+    }
+    body.dark {
+      --bg: #090d16; --card: #131b2e; --text: #f1f5f9; --muted: #94a3b8;
+      --border: #1e293b; --shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+    * {
+      margin: 0; padding: 0; box-sizing: border-box;
+      font-family: 'Inter', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none !important;
+    }
+    input, textarea, select {
+      user-select: text !important;
+      -webkit-user-select: text !important;
+    }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+
+    .custom-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 9999px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+
+    /* USER APP UI STYLES */
+    .icon-btn { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; color: var(--text); background: var(--bg); border: 1px solid var(--border); transition: .2s; flex-shrink: 0; }
+    .icon-btn:active { transform: scale(.92); }
+
+    /* FIXED NON-OVERFLOW SEARCH BAR */
+    header { position: sticky; top: 0; z-index: 40; background: var(--card); border-bottom: 1px solid var(--border); overflow: hidden; width: 100%; }
+    .header-inner { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; max-width: 900px; margin: 0 auto; height: 60px; width: 100%; }
+    .search-overlay {
+      position: absolute; inset: 0; width: 100%; height: 100%; background: var(--card);
+      display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+      transform: translateY(-100%); opacity: 0; pointer-events: none;
+      transition: transform .25s ease, opacity .2s ease; z-index: 50;
+    }
+    .search-overlay.open { transform: translateY(0); opacity: 1; pointer-events: auto; }
+
+    .drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); backdrop-filter: blur(4px); z-index: 90; opacity: 0; pointer-events: none; transition: .3s; }
+    .drawer-backdrop.show { opacity: 1; pointer-events: auto; }
+    .drawer { position: fixed; top: 0; bottom: 0; left: 0; width: 280px; max-width: 85%; background: var(--card); z-index: 100; transform: translateX(-100%); transition: transform .3s cubic-bezier(0.16,1,0.3,1); display: flex; flex-direction: column; }
+    .drawer-backdrop.show .drawer { transform: translateX(0); }
+    .drawer-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; font-weight: 600; color: var(--text); transition: .2s; cursor: pointer; }
+    .drawer-item:active { background: var(--bg); }
+
+    /* HERO SLIDER */
+    .hero-slider { position: relative; border-radius: 20px; overflow: hidden; height: 175px; box-shadow: var(--shadow); margin-bottom: 16px; }
+    .slide { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 18px; opacity: 0; transition: opacity .5s ease; color: #fff; }
+    .slide.active { opacity: 1; }
+    .slide .tag { font-size: 10px; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase; background: rgba(255,255,255,.25); backdrop-filter: blur(4px); padding: 2px 8px; border-radius: 99px; width: fit-content; margin-bottom: 5px; }
+    .dots { position: absolute; right: 14px; bottom: 12px; display: flex; gap: 5px; }
+    .dots span { width: 6px; height: 6px; border-radius: 99px; background: rgba(255,255,255,.4); transition: .3s; }
+    .dots span.on { width: 18px; background: #fff; }
+
+    /* CHIPS & LISTS */
+    .chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 10px; scrollbar-width: none; }
+    .chips::-webkit-scrollbar { display: none; }
+    .chip { flex-shrink: 0; background: var(--card); border: 1px solid var(--border); border-radius: 99px; padding: 7px 14px; font-size: 12.5px; font-weight: 700; color: var(--text); cursor: pointer; transition: .2s; }
+    .chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .h-scroll { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px 14px; scrollbar-width: none; }
+    .h-scroll::-webkit-scrollbar { display: none; }
+
+    .app-card { flex: 0 0 150px; background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 12px; cursor: pointer; transition: transform .2s; position: relative; box-shadow: var(--shadow); }
+    .app-card:active { transform: scale(.96); }
+    .app-icon { width: 54px; height: 54px; border-radius: 14px; margin-bottom: 8px; overflow: hidden; background: var(--bg); display: grid; place-items: center; flex-shrink: 0; }
+    .app-icon img { width: 100%; height: 100%; object-fit: cover; }
+
+    .list-row { display: flex; align-items: center; gap: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 11px 13px; margin-bottom: 9px; box-shadow: var(--shadow); cursor: pointer; transition: .2s; }
+    .list-row .dl-btn-sm { background: var(--bg); color: var(--primary); font-size: 11.5px; font-weight: 700; padding: 6px 14px; border-radius: 99px; border: 1px solid var(--border); cursor: pointer; }
+    
+    .detail { position: fixed; inset: 0; background: var(--bg); z-index: 80; overflow-y: auto; animation: slideUp .25s ease-out; }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+    .dl-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; background: var(--accent); color: #fff; font-size: 15px; font-weight: 800; border-radius: 14px; padding: 13px; margin: 14px 0; cursor: pointer; }
+    .dl-btn.prereg { background: #f59e0b; }
+    .toast { position: fixed; left: 50%; bottom: 25px; transform: translateX(-50%) translateY(20px); background: #0f172a; color: #fff; padding: 10px 20px; border-radius: 99px; font-size: 12px; font-weight: 600; opacity: 0; pointer-events: none; transition: .3s; z-index: 300; white-space: nowrap; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* FULLSCREEN LIGHTBOX MODAL */
+    .lightbox-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 150; display: flex; align-items: center; justify-content: center; padding: 12px; }
+    .lightbox-modal img { max-width: 95%; max-height: 90vh; object-fit: contain; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+  </style>
+</head>
+<body oncontextmenu="return false;">
+
+<!-- FULLSCREEN SCREENSHOT LIGHTBOX -->
+<div id="lightboxModal" class="lightbox-modal hidden" onclick="closeLightbox()">
+  <button onclick="closeLightbox()" class="absolute top-4 right-4 text-white bg-white/20 hover:bg-white/30 w-9 h-9 rounded-full flex items-center justify-center text-sm">✕</button>
+  <img id="lightboxImg" src="" alt="Fullscreen Screenshot" onclick="event.stopPropagation()">
+</div>
+
+<!-- USER APP (APK SZ STORE) -->
+<div id="userStoreApp" class="min-h-screen flex flex-col">
+
+  <!-- DRAWER -->
+  <div class="drawer-backdrop" id="drawerBackdrop" onclick="closeDrawer(event)">
+    <div class="drawer" id="drawer">
+      <div class="p-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center gap-3">
+        <img src="https://i.ibb.co.com/svHF8kCY/file-000000001d64820880cdac1e1065928f.png" class="w-10 h-10 rounded-xl bg-white p-0.5 shadow">
+        <div>
+          <div class="text-sm font-extrabold" id="drawerStoreTitle">APK SZ Store</div>
+          <div class="text-[11px] text-blue-100 font-medium">Safe Android APK Market</div>
+        </div>
+      </div>
+      <div class="flex-1 overflow-y-auto p-3 space-y-1 custom-scroll">
+        <div class="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider px-3 py-1">Navigation</div>
+        <div class="drawer-item" onclick="drawerNav('home')"><i class="fa-solid fa-house text-blue-600 w-5"></i><span>Home</span></div>
+        <div class="drawer-item" onclick="drawerNav('apps')"><i class="fa-solid fa-shapes text-blue-600 w-5"></i><span>Apps</span></div>
+        <div class="drawer-item" onclick="drawerNav('games')"><i class="fa-solid fa-gamepad text-blue-600 w-5"></i><span>Games</span></div>
+        <div class="drawer-item" onclick="drawerNav('browse')"><i class="fa-solid fa-layer-group text-blue-600 w-5"></i><span>Categories</span></div>
+        <div class="drawer-item" onclick="showSavedApps()"><i class="fa-solid fa-heart text-rose-500 w-5"></i><span>Favorites</span></div>
+
+        <div class="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider px-3 pt-3 pb-1">Community & Support</div>
+        <a id="drawerTelegramLink" class="drawer-item" href="https://t.me/" target="_blank"><i class="fa-brands fa-telegram text-sky-500 w-5 text-base"></i><span>Telegram Channel</span></a>
+        <a id="drawerYoutubeLink" class="drawer-item" href="https://youtube.com/" target="_blank"><i class="fa-brands fa-youtube text-red-500 w-5 text-base"></i><span>YouTube Videos</span></a>
+
+        <div class="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider px-3 pt-3 pb-1">Preferences & Legal</div>
+        <div class="drawer-item" onclick="toggleTheme()"><i class="fa-solid fa-moon text-blue-600 w-5"></i><span id="themeTxt">Dark Mode</span></div>
+        <div class="drawer-item" onclick="openPrivacyModal()"><i class="fa-solid fa-shield-halved text-emerald-600 w-5"></i><span>Privacy Policy</span></div>
+        <div class="drawer-item" onclick="requestAppModal()"><i class="fa-solid fa-paper-plane text-indigo-500 w-5"></i><span>Request App</span></div>
+        <div class="drawer-item" onclick="shareStore('APK SZ Store', '')"><i class="fa-solid fa-share-nodes text-blue-600 w-5"></i><span>Share Store</span></div>
+      </div>
+      <div class="p-3 border-t border-[var(--border)] text-center text-[11px] text-slate-400">© 2026 APK SZ Store • Verified Safe</div>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-inner">
+      <div class="flex items-center gap-2.5">
+        <button class="icon-btn" onclick="openDrawer()"><i class="fa-solid fa-bars text-sm"></i></button>
+        <div class="flex items-center gap-2 cursor-pointer" onclick="navGo('home')">
+          <img src="https://i.ibb.co.com/svHF8kCY/file-000000001d64820880cdac1e1065928f.png" class="w-8 h-8 rounded-lg object-cover shadow-sm">
+          <div class="text-sm font-extrabold text-[var(--text)] tracking-tight">APK SZ <span class="text-blue-600">Store</span></div>
+        </div>
+      </div>
+
+      <button class="icon-btn" onclick="openSearch()"><i class="fa-solid fa-magnifying-glass text-xs"></i></button>
+
+      <!-- SEARCH OVERLAY -->
+      <div class="search-overlay" id="searchOverlay">
+        <button class="icon-btn" onclick="closeSearch()"><i class="fa-solid fa-arrow-left text-xs"></i></button>
+        <div class="flex-1 flex items-center gap-2 bg-[var(--bg)] border-2 border-blue-600 rounded-xl px-3 h-10 overflow-hidden">
+          <i class="fa-solid fa-magnifying-glass text-blue-600 text-xs"></i>
+          <input id="searchBox" class="flex-1 bg-transparent text-xs font-semibold outline-none text-[var(--text)]" placeholder="Search apps, games, or MODs..." oninput="doSearch(this.value)">
+          <button class="text-xs text-slate-400 p-1" onclick="$('#searchBox').value=''; doSearch('');">✕</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN APP STORE VIEW -->
+  <main id="mainView" class="flex-1 max-w-4xl w-full mx-auto p-3.5"></main>
+
+  <!-- FOOTER -->
+  <footer class="mt-8 bg-[var(--card)] border-t border-[var(--border)] rounded-t-3xl p-6 text-center text-xs text-[var(--muted)]">
+    <div class="text-sm font-extrabold text-[var(--text)] mb-1" id="footerStoreBrand">APK SZ Store</div>
+    <p class="text-[11px] mb-2" id="footerStoreNotice">The premier hub for verified Android APKs and MODs.</p>
+    <div class="inline-flex items-center gap-1.5 bg-[var(--bg)] px-3 py-1 rounded-full border border-[var(--border)] font-semibold text-[10px] text-emerald-600">
+      <i class="fa-solid fa-shield-halved"></i> 100% Virus & Malware Free Verified
+    </div>
+    <div class="mt-3 text-[10px] opacity-75">© 2026 APK SZ Store Inc. All Rights Reserved.</div>
+    
+    <!-- MINIMAL STEALTH ADMIN LINK -->
+    <div class="mt-4">
+      <span class="inline-block text-[10px] text-slate-400/30 font-bold tracking-widest cursor-pointer hover:text-blue-600 transition" onclick="askPass()">● ADMIN PANEL</span>
+    </div>
+  </footer>
+</div>
+
+
+<!-- DEVELOPER CONSOLE -->
+<div id="adminConsole" class="hidden min-h-screen bg-slate-100 text-slate-800 flex flex-col md:flex-row overflow-x-hidden">
+
+  <!-- Mobile Sidebar Overlay -->
+  <div id="mobileOverlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/60 z-40 hidden md:hidden transition-opacity"></div>
+
+  <!-- Left Sidebar -->
+  <aside id="sidebar" class="fixed md:static inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-300 flex flex-col justify-between transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out border-r border-slate-800 flex-shrink-0">
+    <div>
+      <div class="p-5 flex items-center justify-between border-b border-slate-800">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-white text-xl shadow-lg shadow-emerald-500/20">
+            <i class="fa-solid fa-store"></i>
+          </div>
+          <div>
+            <h1 class="font-extrabold text-base text-white tracking-wide leading-tight">APK SZ Store</h1>
+            <p class="text-[11px] text-emerald-400 font-semibold tracking-wider uppercase">Console Admin</p>
+          </div>
+        </div>
+        <button onclick="toggleSidebar()" class="md:hidden text-slate-400 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <nav class="p-4 space-y-1.5 text-sm font-medium">
+        <a href="javascript:void(0)" onclick="setAdminTab('dashboard')" id="admNav_dashboard" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20">
+          <i class="fa-solid fa-chart-pie w-5"></i> Dashboard
+        </a>
+        <a href="javascript:void(0)" onclick="filterByStatus('All')" id="admNav_apps" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition">
+          <i class="fa-solid fa-mobile-screen-button w-5"></i> All Applications
+        </a>
+        <a href="javascript:void(0)" onclick="filterByStatus('Pre-Registration')" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition">
+          <i class="fa-solid fa-clock-rotate-left w-5"></i> Pre-Registrations
+        </a>
+        <a href="javascript:void(0)" onclick="filterByStatus('Published')" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition">
+          <i class="fa-solid fa-circle-check w-5"></i> Live Published
+        </a>
+        <a href="javascript:void(0)" onclick="setAdminTab('banners')" id="admNav_banners" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition">
+          <i class="fa-solid fa-images w-5"></i> Hero Banners
+        </a>
+        <a href="javascript:void(0)" onclick="setAdminTab('categories')" id="admNav_categories" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition">
+          <i class="fa-solid fa-tags w-5"></i> App Categories
+        </a>
+        <a href="javascript:void(0)" onclick="setAdminTab('social')" id="admNav_social" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition">
+          <i class="fa-solid fa-share-nodes w-5"></i> Social & Community
+        </a>
+        <a href="javascript:void(0)" onclick="setAdminTab('privacy')" id="admNav_privacy" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition">
+          <i class="fa-solid fa-shield-halved w-5"></i> Privacy Policy
+        </a>
+      </nav>
+    </div>
+
+    <div class="p-4 border-t border-slate-800">
+      <button onclick="exitAdminToUserStore()" class="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 py-2.5 rounded-xl font-bold text-xs transition">
+        <i class="fa-solid fa-arrow-left"></i> Exit to User Store
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content Workspace -->
+  <div class="flex-1 flex flex-col h-screen overflow-hidden">
+    
+    <header class="bg-white border-b border-slate-200 px-4 md:px-8 py-3.5 flex items-center justify-between shadow-xs sticky top-0 z-30">
+      <div class="flex items-center gap-3">
+        <button onclick="toggleSidebar()" class="md:hidden p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200">
+          <i class="fa-solid fa-bars text-lg"></i>
+        </button>
+        <div>
+          <h2 id="admHeaderTitle" class="text-base md:text-xl font-bold text-slate-800">Developer Console</h2>
+          <p class="text-xs text-slate-400 hidden sm:block">Manage, monitor, and deploy your store applications</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button onclick="openModal()" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 md:px-5 py-2 rounded-xl font-semibold text-xs md:text-sm shadow-md shadow-emerald-600/20 transition-all">
+          <i class="fa-solid fa-cloud-arrow-up text-sm"></i>
+          <span class="hidden sm:inline">Upload New App</span>
+          <span class="sm:hidden">Upload</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 custom-scroll">
+
+      <!-- SECTION 1: DASHBOARD -->
+      <div id="admSec_dashboard" class="space-y-6">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
+          <div class="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <div class="flex justify-between items-start">
+              <div>
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Uploaded</p>
+                <h3 id="statTotalApps" class="text-xl md:text-3xl font-extrabold text-slate-900 mt-1">0</h3>
+              </div>
+              <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg md:text-xl">
+                <i class="fa-solid fa-cubes"></i>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <div class="flex justify-between items-start">
+              <div>
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pre-Registration</p>
+                <h3 id="statPreApps" class="text-xl md:text-3xl font-extrabold text-amber-500 mt-1">0</h3>
+              </div>
+              <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg md:text-xl">
+                <i class="fa-solid fa-hourglass-half"></i>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <div class="flex justify-between items-start">
+              <div>
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Downloads</p>
+                <h3 id="statTotalDownloads" class="text-xl md:text-3xl font-extrabold text-emerald-600 mt-1">0</h3>
+              </div>
+              <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg md:text-xl">
+                <i class="fa-solid fa-download"></i>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <div class="flex justify-between items-start">
+              <div>
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Visitors</p>
+                <h3 id="statTotalUsers" class="text-xl md:text-3xl font-extrabold text-indigo-600 mt-1">0</h3>
+              </div>
+              <div class="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg md:text-xl">
+                <i class="fa-solid fa-users-rays"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="appsTable" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-4 md:p-6 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
+              <button onclick="filterByStatus('All')" id="btnFilterAll" class="px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-slate-900 text-white shadow-sm transition">All Apps</button>
+              <button onclick="filterByStatus('Published')" id="btnFilterLive" class="px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Published</button>
+              <button onclick="filterByStatus('Pre-Registration')" id="btnFilterPre" class="px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition">Pre-Registration</button>
+            </div>
+
+            <div class="relative w-full md:w-80">
+              <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-sm"></i>
+              <input type="text" id="searchInput" oninput="renderAdminAppTable()" placeholder="Search apps, package, developer..." 
+                     class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition">
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse min-w-[700px]">
+              <thead>
+                <tr class="bg-slate-50/80 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+                  <th class="p-4 pl-6">Application</th>
+                  <th class="p-4">Category</th>
+                  <th class="p-4">Version</th>
+                  <th class="p-4">Downloads / Visitors</th>
+                  <th class="p-4">Status</th>
+                  <th class="p-4 text-center pr-6">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="appTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 2: HERO BANNERS -->
+      <div id="admSec_banners" class="hidden space-y-4">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 flex justify-between items-center shadow-sm">
+          <div>
+            <h3 class="font-bold text-slate-800 text-base">Hero Slider Banners</h3>
+            <p class="text-xs text-slate-400">Live sliding banners displayed on top of the user app</p>
+          </div>
+          <button onclick="openBannerModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-bold text-xs shadow">
+            <i class="fa-solid fa-plus mr-1"></i> Add New Banner
+          </button>
+        </div>
+        <div id="admBannerGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+
+      <!-- SECTION 3: APP CATEGORIES -->
+      <div id="admSec_categories" class="hidden space-y-4">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 class="font-bold text-slate-800 text-sm mb-2">Create New Category</h3>
+          <div class="flex gap-2">
+            <input id="newCatInput" placeholder="e.g. Finance, Strategy, Video Editor" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs outline-none focus:ring-2 focus:ring-emerald-500">
+            <button onclick="addCategory()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow">Add Category</button>
+          </div>
+        </div>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 class="font-bold text-slate-800 text-sm mb-3">Active Store Categories</h3>
+          <div id="admCategoryChips" class="flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+
+      <!-- SECTION 4: SOCIAL & LINKS -->
+      <div id="admSec_social" class="hidden space-y-4">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm max-w-2xl space-y-4">
+          <h3 class="font-bold text-slate-800 text-base border-b border-slate-100 pb-2">Community & Social Links</h3>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Telegram Channel URL</label>
+            <input id="set_telegram" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs outline-none focus:ring-2 focus:ring-emerald-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">YouTube Channel / Video URL</label>
+            <input id="set_youtube" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs outline-none focus:ring-2 focus:ring-emerald-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Store Footer Verified Notice</label>
+            <input id="set_notice" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs outline-none focus:ring-2 focus:ring-emerald-500">
+          </div>
+          <button onclick="saveSocialSettings()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs shadow-md">
+            Save Social Configuration
+          </button>
+        </div>
+      </div>
+
+      <!-- SECTION 5: PRIVACY POLICY -->
+      <div id="admSec_privacy" class="hidden space-y-4">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm max-w-3xl space-y-4">
+          <h3 class="font-bold text-slate-800 text-base border-b border-slate-100 pb-2">Store Privacy Policy & Terms</h3>
+          <textarea id="set_privacy" rows="8" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs outline-none focus:ring-2 focus:ring-emerald-500 custom-scroll"></textarea>
+          <button onclick="savePrivacyPolicy()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-md">
+            Save Privacy Policy
+          </button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ADMIN PASSCODE CHECK -->
+<div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[120] flex items-center justify-center hidden p-4" id="lockScreen">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-xs text-center shadow-2xl border border-slate-100">
+    <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto text-xl mb-3">
+      <i class="fa-solid fa-lock"></i>
+    </div>
+    <input type="password" id="passInput" placeholder="Password" 
+           class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-center text-sm font-semibold outline-none focus:ring-2 focus:ring-emerald-500 my-3"
+           onkeydown="if(event.key==='Enter')tryPass()">
+
+    <div class="flex gap-2">
+      <button onclick="hideLock()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 py-2.5 rounded-xl text-xs font-semibold">Cancel</button>
+      <button onclick="tryPass()" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-xs font-bold shadow-md">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP UPLOAD / UPDATE MODAL -->
+<div id="appModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-3 md:p-6">
+  <div class="bg-white rounded-2xl w-full max-w-4xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+      <div>
+        <h3 id="modalTitle" class="text-base md:text-lg font-bold text-slate-800">Upload New Application</h3>
+        <p class="text-xs text-slate-500">Provide release metadata, APK file, and store visual assets</p>
+      </div>
+      <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-600 flex items-center justify-center transition">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <form id="appForm" onsubmit="handleFormSubmit(event)" class="overflow-y-auto p-4 md:p-6 space-y-6 flex-1 custom-scroll text-slate-700">
+      <input type="hidden" id="editAppId">
+
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">1</span>
+          <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">General Information</h4>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">App Name *</label>
+            <input type="text" id="appName" required placeholder="e.g. CapCut Pro Video Editor" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Package Name *</label>
+            <input type="text" id="appPackage" required placeholder="e.g. com.lemon.lvoverseas" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Developer *</label>
+            <input type="text" id="appDeveloper" required placeholder="e.g. Bytedance Pte. Ltd." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Category *</label>
+              <select id="appCategory" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"></select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Section *</label>
+              <select id="appSection" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none">
+                <option value="Apps">Apps</option>
+                <option value="Games">Games</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">2</span>
+          <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Version, Deployment & Stats</h4>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Version Name *</label>
+            <input type="text" id="appVersion" required value="1.0" placeholder="1.0" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Store Status *</label>
+            <select id="appStatus" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none">
+              <option value="Published" class="text-emerald-600">Published (Download Enabled)</option>
+              <option value="Pre-Registration" class="text-amber-600">Pre-Registration (Download Locked)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Initial Downloads</label>
+            <input type="number" id="appDownloads" value="0" placeholder="0" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">MOD Tags (Optional)</label>
+            <input type="text" id="appMod" placeholder="e.g. Pro Unlocked, No Ads" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none">
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">3</span>
+          <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">APK Package / Direct URL</h4>
+        </div>
+        <div class="border-2 border-dashed border-emerald-300 bg-emerald-50/40 rounded-2xl p-5 text-center">
+          <i class="fa-brands fa-android text-3xl text-emerald-600 mb-1"></i>
+          <h5 class="text-xs font-bold text-slate-800">Select APK File or Enter Direct URL Below</h5>
+          <input type="text" id="appApkUrl" placeholder="Direct APK download link" class="w-full mt-2 mb-3 px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none font-mono">
+          <input type="file" id="appApkFile" accept=".apk" onchange="handleApkFileChange(event)" class="text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:bg-emerald-600 file:text-white cursor-pointer">
+          <div id="apkStatusBanner" class="mt-2 text-xs font-mono font-semibold text-slate-600"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">4</span>
+          <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Graphics & Screenshots</h4>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="border border-slate-200 rounded-2xl p-4 bg-slate-50 text-center">
+            <label class="block text-xs font-semibold text-slate-700 mb-2">App Icon URL / File</label>
+            <input type="text" id="appIconUrl" placeholder="Direct icon image URL" class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs mb-2 outline-none">
+            <input type="file" id="appIconFile" accept="image/*" onchange="handleIconPreview(event)" class="text-xs">
+          </div>
+
+          <div class="md:col-span-2 border border-slate-200 rounded-2xl p-4 bg-slate-50 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="block text-xs font-semibold text-slate-700">Add Unlimited Screenshots</label>
+                <span id="screenshotCountBadge" class="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">0 Added</span>
+              </div>
+              <input type="file" id="appScreenshots" accept="image/*" multiple onchange="handleScreenshotsPreview(event)" class="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-emerald-600 file:text-white cursor-pointer">
+            </div>
+            <div id="screenshotsGrid" class="flex gap-2 overflow-x-auto p-2 bg-white rounded-xl border border-slate-200 min-h-[75px] items-center custom-scroll mt-2">
+              <p id="noScreenshotsText" class="text-xs text-slate-400 m-auto">No screenshots selected</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">5</span>
+          <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Description & Badges</h4>
+        </div>
+        <textarea id="appFullDesc" rows="3" placeholder="Provide complete specifications, features, and notes..." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none"></textarea>
+        
+        <div class="flex gap-4 items-center bg-slate-50 p-3 rounded-xl border border-slate-200 mt-2 text-xs font-semibold">
+          <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="appFeat"> Featured</label>
+          <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="appTop"> Top Chart</label>
+          <label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="appEditor"> Editor's Pick</label>
+        </div>
+      </div>
+
+      <div class="pt-4 border-t border-slate-200 flex justify-end gap-3 sticky bottom-0 bg-white">
+        <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-xs">Cancel</button>
+        <button type="submit" id="saveBtn" class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow flex items-center gap-2">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Save & Deploy
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- VIEW APP MODAL -->
+<div id="viewModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+  <div class="bg-white rounded-3xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative custom-scroll">
+    <button onclick="closeViewModal()" class="absolute right-5 top-5 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">✕</button>
+    <div id="viewContent"></div>
+  </div>
+</div>
+
+<!-- BANNER SLIDER MODAL -->
+<div id="bannerModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+  <div class="bg-white rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-3">
+    <h3 class="font-bold text-slate-800 text-sm">Add / Update Hero Banner</h3>
+    <input id="b_tag" placeholder="Banner Tag (e.g. Trending MOD)" class="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs outline-none">
+    <input id="b_t" placeholder="Banner Title" class="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs outline-none">
+    <input id="b_p" placeholder="Sub-description" class="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs outline-none">
+    <select id="b_g" class="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs outline-none">
+      <option value="linear-gradient(135deg,#1e1b4b,#4338ca)">Indigo Violet Gradient</option>
+      <option value="linear-gradient(135deg,#7f1d1d,#ea580c)">Fire Red Orange Gradient</option>
+      <option value="linear-gradient(135deg,#064e3b,#059669)">Emerald Forest Gradient</option>
+      <option value="linear-gradient(135deg,#0f172a,#2563eb)">Royal Blue Gradient</option>
+    </select>
+    <div class="flex justify-end gap-2 pt-2">
+      <button onclick="$('#bannerModal').classList.add('hidden')" class="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold">Cancel</button>
+      <button onclick="saveBannerSlide()" class="px-5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold">Save Banner</button>
+    </div>
+  </div>
+</div>
+
+<!-- USER PRIVACY POLICY MODAL -->
+<div id="userPrivacyModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+  <div class="bg-white rounded-3xl w-full max-w-xl max-h-[85vh] overflow-y-auto p-6 shadow-2xl relative custom-scroll">
+    <button onclick="$('#userPrivacyModal').classList.add('hidden')" class="absolute right-5 top-5 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">✕</button>
+    <h3 class="text-base font-extrabold text-slate-900 mb-3">Privacy Policy & Terms</h3>
+    <div id="userPrivacyContent" class="text-xs text-slate-600 leading-relaxed whitespace-pre-line"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- JAVASCRIPT LOGIC -->
+<script>
+/* FIREBASE CONFIG */
+const firebaseConfig = {
+  apiKey: "AIzaSyDtj-rczSm738qkoTyROJCnNHmWnPlDEQo",
+  authDomain: "apkszstore.firebaseapp.com",
+  databaseURL: "https://apkszstore-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "apkszstore",
+  storageBucket: "apkszstore.firebasestorage.app",
+  messagingSenderId: "368331147901",
+  appId: "1:368331147901:web:eac39d292f25b1d5d3bf14"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const ADMIN_PASS = "SZ#Admin@2026!StoreX";
+
+const $ = s => document.querySelector(s);
+function toast(m){ const t=$('#toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._x); t._x=setTimeout(()=>t.classList.remove('show'), 2200); }
+
+let APPS = [];
+let CATS = ["Tools","Action","Casual","Video Editor","Photography","Arcade","Music","Social","Education","Business & Finance"];
+let SLIDES = [
+ {id:"s1", t:"CapCut Pro 4K Unlocked",p:"The ultimate video editing studio for mobile creators",g:"linear-gradient(135deg,#1e1b4b,#4338ca)",tag:"Trending Mod"},
+ {id:"s2", t:"Free Fire MAX 120 FPS",p:"Experience ultra-realistic battle royale combat",g:"linear-gradient(135deg,#7f1d1d,#ea580c)",tag:"Top Action Game"},
+ {id:"s3", t:"ChatGPT-4o AI Assistant",p:"Voice and vision powered next-generation intelligence",g:"linear-gradient(135deg,#064e3b,#059669)",tag:"Editor's Choice"}
+];
+let SETTINGS = {
+  storeName: "APK SZ Store",
+  telegram: "https://t.me/your_telegram_channel",
+  youtube: "https://youtube.com/",
+  notice: "The premier hub for verified Android APKs and MODs.",
+  privacy: "APK SZ Store distributes only thoroughly scanned, virus-free, and verified Android APK packages. All trademarks, names, and logos belong to their respective creators."
+};
+
+let currentFilter = 'All';
+let currentIconBase64 = '';
+let currentScreenshots = [];
+let activeApkMetadata = { name: '', size: '' };
+let favorites = JSON.parse(localStorage.getItem('sz_favs')||'[]');
+let view = 'home', heroTimer = null, activeCat = null;
+
+function openLightbox(src){
+  $('#lightboxImg').src = src;
+  $('#lightboxModal').classList.remove('hidden');
+}
+function closeLightbox(){
+  $('#lightboxModal').classList.add('hidden');
+  $('#lightboxImg').src = '';
+}
+
+function icon(a, cls){
+  const imgUrl = a.icon || a.iconUrl || 'https://i.ibb.co.com/svHF8kCY/file-000000001d64820880cdac1e1065928f.png';
+  return `<div class="app-icon ${cls||''}"><img src="${imgUrl}" onerror="this.onerror=null;this.src='https://i.ibb.co.com/svHF8kCY/file-000000001d64820880cdac1e1065928f.png'"></div>`;
+}
+
+function openDrawer(){ $('#drawerBackdrop').classList.add('show'); }
+function closeDrawer(e){ if(!e || e.target.id==='drawerBackdrop' || e===true) $('#drawerBackdrop').classList.remove('show'); }
+function drawerNav(v){ closeDrawer(true); navGo(v); }
+
+function toggleTheme(){
+  const isDark = document.body.classList.toggle('dark');
+  localStorage.setItem('sz_theme', isDark ? 'dark' : 'light');
+  $('#themeTxt').textContent = isDark ? 'Light Mode' : 'Dark Mode';
+}
+if(localStorage.getItem('sz_theme')==='dark') toggleTheme();
+
+function openSearch(){ $('#searchOverlay').classList.add('open'); setTimeout(()=>$('#searchBox').focus(), 120); }
+function closeSearch(){ $('#searchOverlay').classList.remove('open'); $('#searchBox').value=''; renderCurrent(); }
+
+function doSearch(q){
+  q = q.toLowerCase().trim();
+  if(!q){ renderCurrent(); return; }
+  const res = APPS.filter(a=>((a.name||a.n)+(a.category||a.c)+(a.developer||a.d)+(a.mod||'')).toLowerCase().includes(q));
+  $('#mainView').innerHTML = `
+    <div class="my-3"><h3 class="font-bold text-xs">Search Results (${res.length})</h3></div>
+    ${res.map(row).join('') || '<p class="text-center py-12 text-slate-400 text-xs">No matching apps found</p>'}
+  `;
+}
+
+function renderHero(){
+  clearInterval(heroTimer); let cur=0;
+  if(!SLIDES.length) { $('#heroSlider').innerHTML=''; return; }
+  $('#heroSlider').innerHTML = SLIDES.map((s,i)=>`
+    <div class="slide ${i===0?'active':''}" style="background:${s.g}">
+      <div class="tag">${s.tag}</div>
+      <h2 class="text-base font-extrabold leading-tight mb-1">${s.t}</h2>
+      <p class="text-[11px] opacity-90">${s.p}</p>
+    </div>
+  `).join('') + `<div class="dots">${SLIDES.map((_,i)=>`<span class="${i===0?'on':''}"></span>`).join('')}</div>`;
+  
+  heroTimer = setInterval(()=>{
+    cur = (cur+1)%SLIDES.length;
+    document.querySelectorAll('.slide').forEach((el,i)=>el.classList.toggle('active',i===cur));
+    document.querySelectorAll('.dots span').forEach((el,i)=>el.classList.toggle('on',i===cur));
+  }, 4000);
+}
+
+function card(a){
+  const isPre = a.status === 'Pre-Registration';
+  return `
+  <div class="app-card" onclick="openDetail('${a.id}')">
+    ${icon(a)}
+    <div class="font-bold text-xs h-8 overflow-hidden">${a.name || a.n}</div>
+    <div class="text-[10px] text-slate-400 mt-1">${a.category||a.c} • ${a.size||a.s||'Free'}</div>
+    <div class="text-[10px] ${isPre?'text-amber-500':'text-emerald-500'} font-bold mt-1">
+      ${isPre ? '<i class="fa-solid fa-clock"></i> Pre-Register' : `★ ${a.rating||a.r||'1.0'}`}
+    </div>
+    ${a.mod ? `<div class="absolute top-2 right-2 text-[8px] font-extrabold bg-red-100 text-red-600 px-1.5 py-0.5 rounded">MOD</div>` : ''}
+  </div>`;
+}
+
+function row(a){
+  const isPre = a.status === 'Pre-Registration';
+  return `
+  <div class="list-row" onclick="openDetail('${a.id}')">
+    ${icon(a)}
+    <div class="flex-1 min-w-0">
+      <b class="text-xs truncate block">${a.name || a.n}</b>
+      <small class="text-slate-400 text-[10px] block mt-0.5">${a.category||a.c} • ${a.size||a.s||'Free'} • ${isPre ? '<span class="text-amber-500 font-bold">Pre-Register</span>' : '★ ' + (a.rating||a.r||'1.0')}</small>
+    </div>
+    <button class="dl-btn-sm ${isPre?'!text-amber-500 !border-amber-300':''}" onclick="event.stopPropagation();openDetail('${a.id}')">
+      ${isPre ? 'Pre-Register' : 'Get'}
+    </button>
+  </div>`;
+}
+
+function renderHome(){
+  activeCat = null; view = 'home';
+  const featured = APPS.filter(a=>a.feat);
+  const topCharts = APPS.filter(a=>a.top);
+  const editorChoice = APPS.filter(a=>a.editor);
+
+  $('#mainView').innerHTML = `
+    <div class="hero-slider" id="heroSlider"></div>
+    <div class="chips">
+      <div class="chip active" onclick="filterCat('All')">All</div>
+      ${CATS.map(c=>`<div class="chip" onclick="filterCat('${c}')">${c}</div>`).join('')}
+    </div>
+    
+    <div class="my-3"><h3 class="font-extrabold text-xs tracking-wide">🔥 Featured Picks</h3></div>
+    <div class="h-scroll">${featured.map(card).join('') || (APPS.length ? APPS.slice(0,4).map(card).join('') : '<p class="text-slate-400 text-xs py-4">No apps uploaded yet</p>')}</div>
+
+    <div class="my-3"><h3 class="font-extrabold text-xs tracking-wide">📈 Top Charts</h3></div>
+    ${topCharts.map(row).join('') || (APPS.length ? APPS.map(row).join('') : '<p class="text-slate-400 text-xs py-4 text-center">No apps uploaded yet</p>')}
+
+    <div class="my-3"><h3 class="font-extrabold text-xs tracking-wide">✨ Editor's Choice</h3></div>
+    <div class="h-scroll">${editorChoice.map(card).join('') || (APPS.length ? APPS.slice(0,4).map(card).join('') : '<p class="text-slate-400 text-xs py-4">No apps uploaded yet</p>')}</div>
+  `;
+  renderHero();
+}
+
+function filterCat(c){
+  if(c==='All'){ renderHome(); return; }
+  activeCat = c;
+  const res = APPS.filter(a=>(a.category||a.c||'').toLowerCase().includes(c.toLowerCase()));
+  $('#mainView').innerHTML = `
+    <div class="chips mb-3">
+      <div class="chip" onclick="filterCat('All')">All</div>
+      ${CATS.map(cat=>`<div class="chip ${activeCat===cat?'active':''}" onclick="filterCat('${cat}')">${cat}</div>`).join('')}
+    </div>
+    <div class="flex justify-between items-center my-3">
+      <h3 class="font-bold text-xs">Category: ${c} (${res.length})</h3>
+      <button class="dl-btn-sm" onclick="filterCat('All')">✕ Show All</button>
+    </div>
+    ${res.map(row).join('') || '<p class="text-center py-12 text-slate-400 text-xs">No apps found in this category</p>'}
+  `;
+}
+
+function navGo(v){
+  view = v; activeCat = null;
+  if(v==='home'){ renderHome(); return; }
+  let title = v==='apps'?'All Android Apps':v==='games'?'All Android Games':'Categories';
+  let body = '';
+  if(v==='apps') body = APPS.filter(a=>(a.section||a.g)==='Apps').map(row).join('');
+  else if(v==='games') body = APPS.filter(a=>(a.section||a.g)==='Games').map(row).join('');
+  else body = `<div class="chips flex-wrap">${CATS.map(c=>`<div class="chip my-1" onclick="filterCat('${c}')">${c}</div>`).join('')}</div>`;
+
+  $('#mainView').innerHTML = `
+    <div class="my-3"><h3 class="font-extrabold text-xs tracking-wide">${title}</h3></div>
+    ${body || '<p class="text-center py-12 text-slate-400 text-xs">No applications available</p>'}
+  `;
+}
+
+async function triggerDownload(id){
+  const a = APPS.find(x=>String(x.id)===String(id));
+  if(!a || a.status === 'Pre-Registration') return;
+
+  a.downloads = (parseInt(a.downloads) || 0) + 1;
+  try {
+    await db.ref('apps/' + a.id + '/downloads').set(a.downloads);
+  } catch(e){}
+  localStorage.setItem('sz_apps_local', JSON.stringify(APPS));
+
+  toast('Download starting...');
+  const dlCountEl = $(`#detailDownloads_${a.id}`);
+  if(dlCountEl) dlCountEl.innerText = (a.downloads).toLocaleString();
+
+  if(a.apkUrl){
+    const link = document.createElement('a');
+    link.href = a.apkUrl;
+    link.download = (a.name || a.n || 'app') + '.apk';
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+}
+
+function closeDetailModal(){
+  const el = document.querySelector('.detail');
+  if(el) el.remove();
+  try {
+    const url = new URL(window.location);
+    url.searchParams.delete('id');
+    url.searchParams.delete('app');
+    window.history.replaceState({}, '', url.pathname);
+  } catch(e){}
+}
+
+function openDetail(id){
+  const a = APPS.find(x=>String(x.id)===String(id)); 
+  if(!a) return;
+
+  try {
+    const url = new URL(window.location);
+    url.searchParams.set('id', a.id);
+    window.history.replaceState({}, '', url);
+  } catch(e){}
+
+  const isPre = a.status === 'Pre-Registration';
+  const isFav = favorites.includes(a.id);
+  const existing = document.querySelector('.detail');
+  if(existing) existing.remove();
+
+  const d = document.createElement('div'); d.className = 'detail p-4 max-w-xl mx-auto';
+
+  const screenshots = a.screenshots && a.screenshots.length ? `
+    <div class="my-3">
+      <h4 class="font-bold text-xs mb-2 text-slate-400">Screenshots (Tap to view full screen)</h4>
+      <div class="flex gap-2 overflow-x-auto pb-2 custom-scroll">
+        ${a.screenshots.map(s=>`
+          <img src="${s}" onclick="openLightbox('${s}')" class="w-24 h-40 object-cover rounded-xl border border-[var(--border)] flex-shrink-0 shadow-sm cursor-pointer hover:opacity-90 transition">
+        `).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  d.innerHTML = `
+    <div class="flex justify-between items-center pb-3 border-b border-[var(--border)]">
+      <button class="icon-btn" onclick="closeDetailModal()"><i class="fa-solid fa-arrow-left text-xs"></i></button>
+      <div class="flex gap-2">
+        <button class="icon-btn" onclick="shareStore('${(a.name||a.n).replace(/'/g,"")}', '${a.id}')"><i class="fa-solid fa-share-nodes text-xs text-blue-600"></i></button>
+        <button class="icon-btn" onclick="toggleFav('${a.id}')"><i class="fa-solid fa-heart text-xs ${isFav?'text-rose-500':'text-slate-400'}"></i></button>
+      </div>
+    </div>
+
+    <div class="flex gap-3.5 items-center my-4">
+      ${icon(a, 'w-16 h-16')}
+      <div>
+        <h1 class="text-base font-extrabold">${a.name || a.n}</h1>
+        <p class="text-xs text-emerald-600 font-bold">${a.developer || a.d || 'Developer'}</p>
+        <div class="flex gap-1.5 mt-1">
+          <span class="text-[9px] font-bold ${isPre?'bg-amber-100 text-amber-700':'bg-emerald-100 text-emerald-700'} px-2 py-0.5 rounded-full">${a.status||'Published'}</span>
+          ${a.mod ? `<span class="text-[9px] font-bold bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full">MOD: ${a.mod}</span>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-4 bg-[var(--card)] p-3 rounded-2xl border border-[var(--border)] text-center my-3 text-xs">
+      <div><b class="block font-extrabold">${a.rating||a.r||'1.0'} ★</b><small class="text-slate-400 text-[9px]">Rating</small></div>
+      <div><b class="block font-extrabold">${a.size||a.s||'25 MB'}</b><small class="text-slate-400 text-[9px]">Size</small></div>
+      <div><b class="block font-extrabold">v${a.version||a.v||'1.0'}</b><small class="text-slate-400 text-[9px]">Version</small></div>
+      <div><b class="block font-extrabold" id="detailDownloads_${a.id}">${(a.downloads||0).toLocaleString()}</b><small class="text-slate-400 text-[9px]">Downloads</small></div>
+    </div>
+
+    ${isPre ? `
+      <button class="dl-btn prereg" onclick="toast('Pre-registered successfully! Download will be available upon official release.')">
+        <i class="fa-solid fa-bell"></i> Pre-Register (Download Locked)
+      </button>
+    ` : `
+      <button class="dl-btn" onclick="triggerDownload('${a.id}')">
+        <i class="fa-solid fa-download"></i> Download APK Now
+      </button>
+    `}
+
+    ${screenshots}
+
+    <div class="bg-[var(--card)] p-4 rounded-2xl border border-[var(--border)] my-3">
+      <h4 class="font-bold text-xs mb-1.5">About this Application</h4>
+      <p class="text-xs text-slate-500 leading-relaxed whitespace-pre-line">${a.fullDesc||a.desc||'No official description provided.'}</p>
+    </div>
+  `;
+  document.body.appendChild(d);
+}
+
+function toggleFav(id){
+  if(favorites.includes(id)) { favorites = favorites.filter(x=>x!==id); toast('Removed from Favorites'); }
+  else { favorites.push(id); toast('Added to Favorites'); }
+  localStorage.setItem('sz_favs', JSON.stringify(favorites));
+}
+function showSavedApps(){
+  const favApps = APPS.filter(a=>favorites.includes(a.id));
+  $('#mainView').innerHTML = `
+    <div class="my-3"><h3 class="font-extrabold text-xs">Favorite Applications (${favApps.length})</h3></div>
+    ${favApps.map(row).join('')||'<p class="text-center py-12 text-slate-400 text-xs">No favorites saved yet</p>'}
+  `;
+  closeDrawer(true);
+}
+
+/* SMART DEEP LINK SHARE FUNCTION */
+function shareStore(title, appId){
+  let shareUrl = window.location.origin + window.location.pathname;
+  if(appId){
+    shareUrl += '?id=' + encodeURIComponent(appId);
+  }
+  
+  if(navigator.share){
+    navigator.share({
+      title: title || 'APK SZ Store',
+      text: `Download ${title || 'APK'} on APK SZ Store!`,
+      url: shareUrl
+    }).catch(()=>{
+      copyToClip(shareUrl);
+    });
+  } else {
+    copyToClip(shareUrl);
+  }
+}
+
+function copyToClip(text){
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(()=>toast('App link copied to clipboard!')).catch(()=>fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand('copy');
+    toast('App link copied to clipboard!');
+  } catch(e){
+    prompt('Copy this app link:', text);
+  }
+  ta.remove();
+}
+
+function checkDeepLink(){
+  const urlParams = new URLSearchParams(window.location.search);
+  const requestedId = urlParams.get('id') || urlParams.get('app');
+  if(requestedId && APPS.length){
+    const app = APPS.find(a => String(a.id) === String(requestedId));
+    if(app){
+      openDetail(app.id);
+    }
+  }
+}
+
+function requestAppModal(){
+  const n = prompt("Which application or game would you like to request?");
+  if(n) toast("App request submitted: " + n);
+  closeDrawer(true);
+}
+function openPrivacyModal(){
+  $('#userPrivacyContent').innerText = SETTINGS.privacy || 'Official Safe Store Terms.';
+  $('#userPrivacyModal').classList.remove('hidden');
+  closeDrawer(true);
+}
+
+/* ADMIN PANEL METHODS */
+function askPass(){
+  if(sessionStorage.getItem('sz_admin')==='1'){ openAdmin(); return; }
+  $('#lockScreen').classList.remove('hidden');
+  setTimeout(()=>$('#passInput').focus(), 150);
+}
+function hideLock(){ $('#lockScreen').classList.add('hidden'); $('#passInput').value=''; }
+
+function tryPass(){
+  const val = $('#passInput').value;
+  if(val === ADMIN_PASS){
+    sessionStorage.setItem('sz_admin','1');
+    hideLock();
+    openAdmin();
+    toast('Admin Console Unlocked');
+  } else {
+    toast('Access Denied');
+    $('#passInput').value='';
+  }
+}
+
+function openAdmin(){
+  $('#userStoreApp').classList.add('hidden');
+  $('#adminConsole').classList.remove('hidden');
+  setAdminTab('dashboard');
+  updateAdminMetrics();
+  renderAdminAppTable();
+}
+
+function exitAdminToUserStore(){
+  $('#adminConsole').classList.add('hidden');
+  $('#userStoreApp').classList.remove('hidden');
+  renderCurrent();
+}
+
+function toggleSidebar(){
+  $('#sidebar').classList.toggle('-translate-x-full');
+  $('#mobileOverlay').classList.toggle('hidden');
+}
+
+function setAdminTab(tab){
+  ['dashboard','banners','categories','social','privacy'].forEach(t=>{
+    const el = $(`#admSec_${t}`);
+    if(el) el.classList.toggle('hidden', t!==tab);
+    const nav = $(`#admNav_${t}`);
+    if(nav) {
+      nav.className = t===tab 
+        ? "flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+        : "flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition";
+    }
+  });
+
+  if(tab==='banners') renderAdminBanners();
+  if(tab==='categories') renderAdminCategories();
+  if(tab==='social') {
+    $('#set_telegram').value = SETTINGS.telegram||'';
+    $('#set_youtube').value = SETTINGS.youtube||'';
+    $('#set_notice').value = SETTINGS.notice||'';
+  }
+  if(tab==='privacy') {
+    $('#set_privacy').value = SETTINGS.privacy||'';
+  }
+}
+
+function updateAdminMetrics(){
+  const totalDownloads = APPS.reduce((acc, curr) => acc + (parseInt(curr.downloads) || 0), 0);
+  const totalVisitors = APPS.reduce((acc, curr) => acc + (parseInt(curr.visitors) || 0), 0);
+
+  $('#statTotalApps').innerText = APPS.length;
+  $('#statPreApps').innerText = APPS.filter(a => a.status === 'Pre-Registration').length;
+  $('#statTotalDownloads').innerText = formatCompact(totalDownloads);
+  $('#statTotalUsers').innerText = formatCompact(totalVisitors);
+}
+
+function formatCompact(num){
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return (num||0).toLocaleString();
+}
+
+function filterByStatus(status){
+  currentFilter = status;
+  setAdminTab('dashboard');
+  ['btnFilterAll', 'btnFilterLive', 'btnFilterPre'].forEach(id => {
+    $('#' + id).className = "px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition";
+  });
+  if (status === 'All') $('#btnFilterAll').className = "px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-slate-900 text-white shadow-sm";
+  if (status === 'Published') $('#btnFilterLive').className = "px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-emerald-600 text-white shadow-sm";
+  if (status === 'Pre-Registration') $('#btnFilterPre').className = "px-4 py-2 rounded-xl text-xs md:text-sm font-semibold bg-amber-500 text-white shadow-sm";
+
+  renderAdminAppTable();
+}
+
+function renderAdminAppTable(){
+  const sq = ($('#searchInput').value||'').toLowerCase();
+  const filtered = APPS.filter(a => {
+    const matchesFilter = currentFilter === 'All' ? true : a.status === currentFilter;
+    const matchesSearch = (a.name||a.n||'').toLowerCase().includes(sq) ||
+                          (a.package||'').toLowerCase().includes(sq) ||
+                          (a.developer||a.d||'').toLowerCase().includes(sq);
+    return matchesFilter && matchesSearch;
+  });
+
+  $('#appTableBody').innerHTML = filtered.map(app => `
+    <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+      <td class="p-4 pl-6">
+        <div class="flex items-center gap-3">
+          <img src="${app.icon || 'https://via.placeholder.com/80'}" class="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-xs">
+          <div>
+            <h4 class="font-bold text-slate-900 text-xs">${app.name || app.n}</h4>
+            <p class="text-[10px] text-slate-400 font-mono">${app.package||'app.package'}</p>
+            <p class="text-[10px] text-emerald-600 font-medium">${app.developer||app.d}</p>
+          </div>
+        </div>
+      </td>
+      <td class="p-4"><span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium">${app.category||app.c}</span></td>
+      <td class="p-4 font-mono text-xs font-semibold text-slate-700"><span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md">v${app.version||app.v||'1.0'}</span></td>
+      <td class="p-4 text-xs">
+        <p class="font-bold text-slate-800"><i class="fa-solid fa-download text-emerald-500 mr-1"></i> ${formatCompact(app.downloads || 0)}</p>
+        <p class="text-slate-400 text-[10px]"><i class="fa-solid fa-eye text-indigo-400 mr-1"></i> ${formatCompact(app.visitors || 0)} Visitors</p>
+      </td>
+      <td class="p-4">
+        ${app.status === 'Published' 
+          ? '<span class="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs rounded-full font-bold">Live</span>'
+          : '<span class="px-3 py-1 bg-amber-100 text-amber-700 text-xs rounded-full font-bold">Pre-Registration</span>'
+        }
+      </td>
+      <td class="p-4 text-center pr-6 space-x-1">
+        <button onclick="viewApp('${app.id}')" class="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200"><i class="fa-solid fa-eye text-xs"></i></button>
+        <button onclick="openModal('${app.id}')" class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100"><i class="fa-solid fa-pen text-xs"></i></button>
+        <button onclick="deleteApp('${app.id}')" class="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100"><i class="fa-solid fa-trash text-xs"></i></button>
+      </td>
+    </tr>
+  `).join('') || `<tr><td colspan="6" class="p-8 text-center text-slate-400 text-xs">No applications uploaded yet</td></tr>`;
+}
+
+function openModal(id = null){
+  $('#appCategory').innerHTML = CATS.map(c=>`<option value="${c}">${c}</option>`).join('');
+  $('#appForm').reset();
+  currentIconBase64 = '';
+  currentScreenshots = [];
+  activeApkMetadata = { name: '', size: '' };
+
+  if(id){
+    $('#modalTitle').innerText = "Update Application & Replace Package";
+    $('#saveBtn').innerHTML = `<i class="fa-solid fa-arrows-rotate mr-1"></i> Update Application`;
+    const app = APPS.find(a => a.id === id);
+
+    $('#editAppId').value = app.id;
+    $('#appName').value = app.name || app.n;
+    $('#appPackage').value = app.package || '';
+    $('#appDeveloper').value = app.developer || app.d;
+    $('#appCategory').value = app.category || app.c;
+    $('#appSection').value = app.section || app.g || 'Apps';
+    $('#appVersion').value = app.version || app.v || '1.0';
+    $('#appStatus').value = app.status || 'Published';
+    $('#appDownloads').value = app.downloads || 0;
+    $('#appMod').value = app.mod || '';
+    $('#appApkUrl').value = app.apkUrl || '';
+    $('#appIconUrl').value = app.icon || app.iconUrl || '';
+    $('#appFullDesc').value = app.fullDesc || app.desc || '';
+    $('#appFeat').checked = !!app.feat;
+    $('#appTop').checked = !!app.top;
+    $('#appEditor').checked = !!app.editor;
+
+    activeApkMetadata.name = app.apkName || 'release.apk';
+    activeApkMetadata.size = app.apkSize || app.size || '25 MB';
+    $('#apkStatusBanner').innerHTML = `<span class="text-emerald-700 bg-emerald-50 px-2 py-1 rounded">Current Package: ${activeApkMetadata.name} (${activeApkMetadata.size})</span>`;
+
+    currentScreenshots = [...(app.screenshots || [])];
+    renderScreenshotsPreview();
+  } else {
+    $('#modalTitle').innerText = "Upload New Application to Store";
+    $('#saveBtn').innerHTML = `<i class="fa-solid fa-cloud-arrow-up mr-1"></i> Save & Deploy`;
+    $('#editAppId').value = '';
+    $('#appVersion').value = '1.0';
+    $('#appDownloads').value = '0';
+    $('#apkStatusBanner').innerHTML = `<span class="text-slate-400">No APK selected</span>`;
+    renderScreenshotsPreview();
+  }
+  $('#appModal').classList.remove('hidden');
+}
+function closeModal(){ $('#appModal').classList.add('hidden'); }
+
+function handleApkFileChange(e){
+  const file = e.target.files[0];
+  if(file){
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+    activeApkMetadata.name = file.name;
+    activeApkMetadata.size = sizeMb;
+    $('#apkStatusBanner').innerHTML = `<span class="text-emerald-700 font-bold">Auto-Replace Active: ${file.name} (${sizeMb})</span>`;
+  }
+}
+function handleIconPreview(e){
+  const file = e.target.files[0];
+  if(file){
+    const r = new FileReader();
+    r.onload = ev => currentIconBase64 = ev.target.result;
+    r.readAsDataURL(file);
+  }
+}
+function handleScreenshotsPreview(e){
+  Array.from(e.target.files).forEach(file => {
+    const r = new FileReader();
+    r.onload = ev => { currentScreenshots.push(ev.target.result); renderScreenshotsPreview(); };
+    r.readAsDataURL(file);
+  });
+}
+function removeScreenshot(idx){ currentScreenshots.splice(idx,1); renderScreenshotsPreview(); }
+function renderScreenshotsPreview(){
+  $('#screenshotCountBadge').innerText = `${currentScreenshots.length} Added`;
+  if(!currentScreenshots.length){ $('#screenshotsGrid').innerHTML = `<p class="text-xs text-slate-400 m-auto">No screenshots selected</p>`; return; }
+  $('#screenshotsGrid').innerHTML = currentScreenshots.map((s, idx)=>`
+    <div class="relative w-12 h-16 rounded-lg overflow-hidden border border-slate-300 flex-shrink-0">
+      <img src="${s}" class="w-full h-full object-cover">
+      <button type="button" onclick="removeScreenshot(${idx})" class="absolute top-0.5 right-0.5 bg-rose-600 text-white w-3.5 h-3.5 rounded-full text-[8px] flex items-center justify-center">✕</button>
+    </div>
+  `).join('');
+}
+
+async function handleFormSubmit(e){
+  e.preventDefault();
+  const editId = $('#editAppId').value;
+  const appObj = {
+    id: editId || 'app_' + Date.now(),
+    name: $('#appName').value.trim(),
+    package: $('#appPackage').value.trim(),
+    developer: $('#appDeveloper').value.trim(),
+    category: $('#appCategory').value,
+    section: $('#appSection').value,
+    version: $('#appVersion').value.trim() || '1.0',
+    status: $('#appStatus').value,
+    downloads: parseInt($('#appDownloads').value) || 0,
+    visitors: Math.floor(Math.random()*1000) + 50,
+    mod: $('#appMod').value.trim(),
+    size: activeApkMetadata.size || '25 MB',
+    rating: 1.0,
+    apkUrl: $('#appApkUrl').value.trim(),
+    apkName: activeApkMetadata.name || 'release.apk',
+    apkSize: activeApkMetadata.size || '25 MB',
+    icon: currentIconBase64 || $('#appIconUrl').value.trim() || 'https://i.ibb.co.com/svHF8kCY/file-000000001d64820880cdac1e1065928f.png',
+    screenshots: currentScreenshots,
+    fullDesc: $('#appFullDesc').value.trim(),
+    feat: $('#appFeat').checked ? 1 : 0,
+    top: $('#appTop').checked ? 1 : 0,
+    editor: $('#appEditor').checked ? 1 : 0
+  };
+
+  try{ await db.ref('apps/' + appObj.id).set(appObj); }catch(e){}
+  const idx = APPS.findIndex(a=>a.id===appObj.id);
+  if(idx>-1) APPS[idx] = appObj; else APPS.unshift(appObj);
+  localStorage.setItem('sz_apps_local', JSON.stringify(APPS));
+
+  toast(editId ? 'Application updated successfully!' : 'New app deployed!');
+  closeModal();
+  updateAdminMetrics();
+  renderAdminAppTable();
+  renderCurrent();
+}
+
+async function deleteApp(id){
+  if(!confirm("Are you sure you want to delete this application?")) return;
+  try{ await db.ref('apps/' + id).remove(); }catch(e){}
+  APPS = APPS.filter(a=>a.id!==id);
+  localStorage.setItem('sz_apps_local', JSON.stringify(APPS));
+  toast("Application deleted");
+  updateAdminMetrics();
+  renderAdminAppTable();
+  renderCurrent();
+}
+
+function viewApp(id){
+  const a = APPS.find(x=>x.id===id); if(!a) return;
+  const screenshots = a.screenshots && a.screenshots.length ? `
+    <div class="mt-3">
+      <h5 class="text-xs font-bold text-slate-400 uppercase mb-2">Screenshot Gallery</h5>
+      <div class="flex gap-2 overflow-x-auto pb-2 custom-scroll">
+        ${a.screenshots.map(s => `<img src="${s}" onclick="openLightbox('${s}')" class="w-20 h-36 object-cover rounded-xl border cursor-pointer hover:opacity-90 transition">`).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  $('#viewContent').innerHTML = `
+    <div class="flex items-start gap-4 border-b border-slate-100 pb-4">
+      <img src="${a.icon||'https://via.placeholder.com/90'}" class="w-16 h-16 rounded-2xl object-cover border">
+      <div>
+        <h3 class="text-base font-bold text-slate-900">${a.name||a.n}</h3>
+        <p class="text-xs font-mono text-slate-400">${a.package}</p>
+        <p class="text-xs text-emerald-600 font-semibold mt-1">${a.developer||a.d} • v${a.version||a.v||'1.0'}</p>
+      </div>
+    </div>
+    <div class="py-4 space-y-3 text-xs text-slate-700">
+      <p><b>Status:</b> ${a.status}</p>
+      <p><b>Category:</b> ${a.category||a.c}</p>
+      <p><b>Package File:</b> ${a.apkName||'release.apk'} (${a.size||'25 MB'})</p>
+      <p><b>Description:</b> ${a.fullDesc||a.desc||'No description'}</p>
+      ${screenshots}
+    </div>
+  `;
+  $('#viewModal').classList.remove('hidden');
+}
+function closeViewModal(){ $('#viewModal').classList.add('hidden'); }
+
+function renderAdminBanners(){
+  $('#admBannerGrid').innerHTML = SLIDES.map((s, idx)=>`
+    <div class="p-4 rounded-2xl border relative overflow-hidden" style="background:${s.g}">
+      <span class="text-[9px] font-extrabold uppercase bg-white/20 px-2 py-0.5 rounded-full text-white">${s.tag}</span>
+      <h4 class="text-sm font-extrabold text-white mt-1">${s.t}</h4>
+      <p class="text-xs text-white/80">${s.p}</p>
+      <button onclick="deleteBanner(${idx})" class="absolute top-3 right-3 bg-red-600 text-white p-1 rounded-lg text-xs"><i class="fa-solid fa-trash"></i></button>
+    </div>
+  `).join('') || '<p class="text-slate-400 text-xs">No banners added</p>';
+}
+function openBannerModal(){ $('#bannerModal').classList.remove('hidden'); }
+async function saveBannerSlide(){
+  const slide = {
+    id: 's_' + Date.now(),
+    tag: $('#b_tag').value.trim() || 'Featured',
+    t: $('#b_t').value.trim() || 'New Promo',
+    p: $('#b_p').value.trim() || 'Special store release',
+    g: $('#b_g').value
+  };
+  SLIDES.push(slide);
+  try{ await db.ref('slides').set(SLIDES); }catch(e){}
+  localStorage.setItem('sz_slides_local', JSON.stringify(SLIDES));
+  $('#bannerModal').classList.add('hidden');
+  renderAdminBanners();
+  toast("Banner added");
+}
+async function deleteBanner(idx){
+  SLIDES.splice(idx,1);
+  try{ await db.ref('slides').set(SLIDES); }catch(e){}
+  localStorage.setItem('sz_slides_local', JSON.stringify(SLIDES));
+  renderAdminBanners();
+}
+
+function renderAdminCategories(){
+  $('#admCategoryChips').innerHTML = CATS.map((c, idx)=>`
+    <div class="bg-slate-100 border text-slate-700 px-3 py-1.5 rounded-xl text-xs flex items-center gap-2">
+      <span>${c}</span>
+      <button onclick="deleteCategory(${idx})" class="text-rose-500 font-bold">✕</button>
+    </div>
+  `).join('');
+}
+async function addCategory(){
+  const val = $('#newCatInput').value.trim();
+  if(!val) return;
+  if(!CATS.includes(val)) CATS.push(val);
+  $('#newCatInput').value = '';
+  try{ await db.ref('categories').set(CATS); }catch(e){}
+  localStorage.setItem('sz_cats_local', JSON.stringify(CATS));
+  renderAdminCategories();
+  toast("Category added");
+}
+async function deleteCategory(idx){
+  CATS.splice(idx, 1);
+  try{ await db.ref('categories').set(CATS); }catch(e){}
+  localStorage.setItem('sz_cats_local', JSON.stringify(CATS));
+  renderAdminCategories();
+}
+
+async function saveSocialSettings(){
+  SETTINGS.telegram = $('#set_telegram').value.trim();
+  SETTINGS.youtube = $('#set_youtube').value.trim();
+  SETTINGS.notice = $('#set_notice').value.trim();
+  try{ await db.ref('settings').set(SETTINGS); }catch(e){}
+  localStorage.setItem('sz_settings_local', JSON.stringify(SETTINGS));
+  applySettingsToStore();
+  toast("Social settings saved!");
+}
+async function savePrivacyPolicy(){
+  SETTINGS.privacy = $('#set_privacy').value.trim();
+  try{ await db.ref('settings').set(SETTINGS); }catch(e){}
+  localStorage.setItem('sz_settings_local', JSON.stringify(SETTINGS));
+  toast("Privacy Policy updated!");
+}
+function applySettingsToStore(){
+  if(SETTINGS.telegram) $('#drawerTelegramLink').href = SETTINGS.telegram;
+  if(SETTINGS.youtube) $('#drawerYoutubeLink').href = SETTINGS.youtube;
+  if(SETTINGS.notice) $('#footerStoreNotice').innerText = SETTINGS.notice;
+}
+
+function renderCurrent(){
+  if(view==='home'){ if(activeCat) filterCat(activeCat); else renderHome(); }
+  else navGo(view);
+}
+
+function initData(){
+  db.ref('apps').on('value', snap => {
+    const data = snap.val();
+    APPS = data ? Object.values(data) : (JSON.parse(localStorage.getItem('sz_apps_local')) || []);
+    renderCurrent();
+    checkDeepLink();
+  }, () => {
+    APPS = JSON.parse(localStorage.getItem('sz_apps_local')) || [];
+    renderCurrent();
+    checkDeepLink();
+  });
+
+  db.ref('slides').on('value', snap => {
+    const data = snap.val();
+    if(data) SLIDES = Object.values(data);
+    if(view==='home') renderHero();
+  });
+
+  db.ref('categories').on('value', snap => {
+    const data = snap.val();
+    if(data) CATS = Object.values(data);
+  });
+
+  db.ref('settings').on('value', snap => {
+    const data = snap.val();
+    if(data){ SETTINGS = data; applySettingsToStore(); }
+  });
+}
+
+initData();
+applySettingsToStore();
+renderHome();
+</script>
+</body>
+</html>
